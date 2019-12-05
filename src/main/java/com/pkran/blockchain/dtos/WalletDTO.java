@@ -1,9 +1,18 @@
 package com.pkran.blockchain.dtos;
 
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+
+@ApiModel(description = "WalletDTO")
 public class WalletDTO {
 
+    @ApiModelProperty(notes = "Username")
     private String username;
+
+    @ApiModelProperty(notes = "Public key string")
     private String publicKey;
+
+    @ApiModelProperty(notes = "Balance")
     private Float balance;
 
     public WalletDTO(String username, String publicKey, Float balance) {

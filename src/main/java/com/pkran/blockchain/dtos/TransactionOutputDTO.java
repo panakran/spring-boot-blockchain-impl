@@ -1,10 +1,21 @@
 package com.pkran.blockchain.dtos;
 
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+
+@ApiModel(description = "TransactionOutputDTO")
 public class TransactionOutputDTO {
 
+    @ApiModelProperty(notes = "Transaction output id")
     private String id;
+
+    @ApiModelProperty(notes = "Recipient public key")
     private String recipient; //also known as the new owner of these coins.
+
+    @ApiModelProperty(notes = "Recipients amount they own")
     private Float value; //the amount of coins they own
+
+    @ApiModelProperty(notes = "Parent transaction id")
     private String parentTransactionId; //the id of the transaction this output was created in
 
     public TransactionOutputDTO() {

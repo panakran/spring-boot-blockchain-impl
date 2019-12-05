@@ -1,7 +1,15 @@
 package com.pkran.blockchain.dtos;
 
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+
+@ApiModel(description = "NewWalletDTO")
 public class NewWalletDTO {
+
+    @ApiModelProperty(notes = "New user username")
     private String username;
+
+    @ApiModelProperty(notes = "Amount to add to new wallet")
     private Float amount;
 
     public NewWalletDTO(String username, Float amount) {

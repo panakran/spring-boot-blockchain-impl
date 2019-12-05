@@ -5,8 +5,6 @@ import com.pkran.blockchain.Utilities.SecurityUtil;
 import com.pkran.blockchain.Utilities.StringUtil;
 import com.pkran.blockchain.dtos.BlockDTO;
 import com.pkran.blockchain.dtos.NewTransactionDTO;
-import com.pkran.blockchain.dtos.NewWalletDTO;
-import com.pkran.blockchain.dtos.WalletDTO;
 import com.pkran.blockchain.exceptions.ErrorCode;
 import com.pkran.blockchain.exceptions.IntegrityException;
 import com.pkran.blockchain.mappers.Mapper;

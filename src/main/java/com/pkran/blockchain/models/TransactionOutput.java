@@ -1,6 +1,7 @@
 package com.pkran.blockchain.models;
 
 import com.pkran.blockchain.Utilities.SecurityUtil;
+import com.pkran.blockchain.Utilities.StringUtil;
 
 import java.security.PublicKey;
 
@@ -16,7 +17,7 @@ public class TransactionOutput {
         this.recipient = recipient;
         this.value = value;
         this.parentTransactionId = parentTransactionId;
-        this.id = SecurityUtil.applySha256(SecurityUtil.getStringFromKey(this.getRecipient())+Float.toString(value)+parentTransactionId);
+        this.id = SecurityUtil.applySha256(StringUtil.getStringFromKey(this.getRecipient())+Float.toString(value)+parentTransactionId);
     }
 
     //Check if coin belongs to you

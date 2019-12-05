@@ -4,9 +4,9 @@ import java.security.*;
 import java.util.HashMap;
 
 public class Wallet {
-    public PrivateKey privateKey;
-    public PublicKey publicKey;
-    public HashMap<String, TransactionOutput> UTXOs = new HashMap<>(); //only UTXOs owned by this wallet.
+    private PrivateKey privateKey;
+    private PublicKey publicKey;
+    private HashMap<String, TransactionOutput> UTXOs = new HashMap<>(); //only UTXOs owned by this wallet.
 
     public PrivateKey getPrivateKey() {
         return privateKey;

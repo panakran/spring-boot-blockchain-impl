@@ -2,21 +2,31 @@ package com.pkran.blockchain.services;
 
 import com.pkran.blockchain.Utilities.BlockchainUtil;
 import com.pkran.blockchain.Utilities.SecurityUtil;
+import com.pkran.blockchain.Utilities.StringUtil;
+import com.pkran.blockchain.dtos.BlockDTO;
+import com.pkran.blockchain.dtos.NewTransactionDTO;
+import com.pkran.blockchain.dtos.NewWalletDTO;
+import com.pkran.blockchain.dtos.WalletDTO;
+import com.pkran.blockchain.exceptions.ErrorCode;
+import com.pkran.blockchain.exceptions.IntegrityException;
+import com.pkran.blockchain.mappers.Mapper;
 import com.pkran.blockchain.models.*;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
+import java.math.BigDecimal;
 import java.security.PublicKey;
 import java.security.Security;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ChainService {
 
     public List<Block> blocks = new ArrayList<>();
-    public List<Wallet> wallets = new ArrayList<>();
+    public HashMap<String, Wallet> wallets = new HashMap<>();
     public HashMap<String, TransactionOutput> UTXOs = new HashMap<>(); //list of all unspent transactions.
     public static float minimumTransaction = 0.1f;
 
@@ -26,38 +36,49 @@ public class ChainService {
     @Value("${coinbase.amount}")
     public Float COINBASE_AMOUNT;
 
+    @Value("${coinbase.amount.b}")
+    public BigDecimal COINBASE_AMOUNTB;
+
     @PostConstruct
     public void init() {
-        Security.addProvider(new BouncyCastleProvider()); //Setup Bouncey castle as a Security Provider
+        Security.addProvider(new BouncyCastleProvider()); //Setup Bouncy castle as a Security Provider
 
-        //Create wallets:
         Wallet walletA = new Wallet();
         SecurityUtil.generateKeyPair(walletA);
+        wallets.put("test1", walletA);
         Wallet walletB = new Wallet();
         SecurityUtil.generateKeyPair(walletB);
+        wallets.put("test2", walletB);
 
         Wallet base = new Wallet();
         SecurityUtil.generateKeyPair(base);
         Wallet coinbase = new Wallet();
         SecurityUtil.generateKeyPair(coinbase);
+        wallets.put("coinbase", coinbase);
 
-        //create genesis transaction, which sends 100 NoobCoin to walletA:
-        Transaction genesisTransaction = new Transaction(coinbase.publicKey, walletA.publicKey, COINBASE_AMOUNT, null);
-        BlockchainUtil.generateSignature(coinbase.privateKey, genesisTransaction);//manually sign the genesis transaction
+        Transaction genesisTransaction = new Transaction(base.getPublicKey(), coinbase.getPublicKey(), COINBASE_AMOUNT, null);
+        BlockchainUtil.generateSignature(coinbase.getPrivateKey(), genesisTransaction);//manually sign the genesis transaction
         genesisTransaction.setTransactionId("0");//manually set the transaction id
         genesisTransaction.getOutputs().add(new TransactionOutput(genesisTransaction.getRecipient(), genesisTransaction.getValue(), genesisTransaction.getTransactionId())); //manually add the Transactions Output
         UTXOs.put(genesisTransaction.getOutputs().get(0).getId(), genesisTransaction.getOutputs().get(0)); //its important to store our first transaction in the UTXOs list.
-
         System.out.println("Creating and Mining Genesis block... ");
         Block genesis = new Block("0");
         addTransaction(genesis, genesisTransaction);
         addBlock(DIFFICULTY, genesis);
 
-        Block block1 = new Block(genesis.getHash());
+        Block block1 = new Block(blocks.get(blocks.size() - 1).getHash());
+        System.out.println("\ncoinbase's balance is: " + getBalance(coinbase));
+        System.out.println("\ncoinbase is Attempting to send funds (1000) to WalletA...");
+        addTransaction(block1, sendFunds(coinbase, walletA.getPublicKey(), 1000f));
+        addBlock(DIFFICULTY, block1);
+        System.out.println("\ncoinbase's balance is: " + getBalance(coinbase));
+        System.out.println("WalletA's balance is: " + getBalance(walletA));
+
+        Block block2 = new Block(blocks.get(blocks.size() - 1).getHash());
         System.out.println("\nWalletA's balance is: " + getBalance(walletA));
         System.out.println("\nWalletA is Attempting to send funds (40) to WalletB...");
-        addTransaction(block1, sendFunds(walletA, walletB.publicKey, 40f));
-        addBlock(DIFFICULTY, block1);
+        addTransaction(block1, sendFunds(walletA, walletA.getPublicKey(), 40f));
+        addBlock(DIFFICULTY, block2);
         System.out.println("\nWalletA's balance is: " + getBalance(walletA));
         System.out.println("WalletB's balance is: " + getBalance(walletB));
 
@@ -65,22 +86,24 @@ public class ChainService {
 
     }
 
-    public List<Block> addBlock() {
-        Block secondBlock = new Block(blocks.get(blocks.size() - 1).getHash());
-        System.out.println("Hash for block 2 : " + secondBlock.getHash());
-        blocks.add(secondBlock);
-        return blocks;
+    public List<BlockDTO> getBlockchain() {
+        return blocks.subList(1, blocks.size() - 1).stream().map(Mapper::map).collect(Collectors.toList());
     }
 
-    public List<Block> getBlockchain() {
-        return blocks;
+    public void createTransactions(List<NewTransactionDTO> newTransactionDTOList) {
+        Block block = new Block(blocks.get(blocks.size() - 1).getHash());
+        newTransactionDTOList
+                .stream()
+                .map(t -> sendFunds(wallets.get(t.getSender()), wallets.get(t.getReceiver()).getPublicKey(), t.getAmount()))
+                .forEach(t -> addTransaction(block, t));
+        addBlock(DIFFICULTY, block);
     }
 
-    public Boolean isChainValid() {
+    public void isChainValid() {
         Block currentBlock;
         Block previousBlock;
-        String hashTarget = new String(new char[DIFFICULTY]).replace('\0', '0');
-        HashMap<String, TransactionOutput> tempUTXOs = new HashMap<String, TransactionOutput>(); //a temporary working list of unspent transactions at a given block state.
+        String hashTarget = StringUtil.createZerosStringFromInteger(DIFFICULTY);
+        HashMap<String, TransactionOutput> tempUTXOs = new HashMap<>(); //a temporary working list of unspent transactions at a given block state.
         tempUTXOs.put(blocks.get(0).getTransactions().get(0).getOutputs().get(0).getId(), blocks.get(0).getTransactions().get(0).getOutputs().get(0));
 
         //loop through blockchain to check hashes:
@@ -90,45 +113,38 @@ public class ChainService {
             previousBlock = blocks.get(i - 1);
             //compare registered hash and calculated hash:
             if (!currentBlock.getHash().equals(BlockchainUtil.calculateHash(currentBlock))) {
-                System.out.println("#Current Hashes not equal");
-                return false;
+                throw new IntegrityException(ErrorCode.CURRENT_HASHES_NOT_EQUAL);
             }
             //compare previous hash and registered previous hash
             if (!previousBlock.getHash().equals(currentBlock.getPreviousHash())) {
-                System.out.println("#Previous Hashes not equal");
-                return false;
+                throw new IntegrityException(ErrorCode.PREVIOUS_HASHES_NOT_EQUAL);
             }
             //check if hash is solved
             if (!currentBlock.getHash().substring(0, DIFFICULTY).equals(hashTarget)) {
-                System.out.println("#This block hasn't been mined");
-                return false;
+                throw new IntegrityException(ErrorCode.BLOCK_NOT_MINED);
             }
 
             //loop thru blockchains transactions:
             TransactionOutput tempOutput;
-            for (int t = 0; t < currentBlock.transactions.size(); t++) {
-                Transaction currentTransaction = currentBlock.transactions.get(t);
+            for (int t = 0; t < currentBlock.getTransactions().size(); t++) {
+                Transaction currentTransaction = currentBlock.getTransactions().get(t);
 
                 if (!BlockchainUtil.verifySignature(currentTransaction)) {
-                    System.out.println("#Signature on Transaction(" + t + ") is Invalid");
-                    return false;
+                    throw new IntegrityException(ErrorCode.TRANSACTION_SIGNATURE_INVALID);
                 }
                 if (!BlockchainUtil.getInputsValue(currentTransaction).equals(BlockchainUtil.getOutputsValue(currentTransaction))) {
-                    System.out.println("#Inputs are note equal to outputs on Transaction(" + t + ")");
-                    return false;
+                    throw new IntegrityException(ErrorCode.INPUTS_NOT_EQUAL_TO_OUTPUTS);
                 }
 
                 for (TransactionInput input : currentTransaction.getInputs()) {
                     tempOutput = tempUTXOs.get(input.getTransactionOutputId());
 
                     if (tempOutput == null) {
-                        System.out.println("#Referenced input on Transaction(" + t + ") is Missing");
-                        return false;
+                        throw new IntegrityException(ErrorCode.TRANSACTION_REFERENCE_INPUT_MISSING);
                     }
 
-                    if (input.getUTXO().getValue() != tempOutput.getValue()) {
-                        System.out.println("#Referenced input Transaction(" + t + ") value is Invalid");
-                        return false;
+                    if (!input.getUTXO().getValue().equals(tempOutput.getValue())) {
+                        throw new IntegrityException(ErrorCode.TRANSACTION_REFERENCE_VALUE_INVALID);
                     }
 
                     tempUTXOs.remove(input.getTransactionOutputId());
@@ -139,19 +155,16 @@ public class ChainService {
                 }
 
                 if (currentTransaction.getOutputs().get(0).getRecipient() != currentTransaction.getRecipient()) {
-                    System.out.println("#Transaction(" + t + ") output reciepient is not who it should be");
-                    return false;
+                    throw new IntegrityException(ErrorCode.OUTPUT_RECIPIENT_IS_INVALID);
                 }
                 if (currentTransaction.getOutputs().get(1).getRecipient() != currentTransaction.getSender()) {
-                    System.out.println("#Transaction(" + t + ") output 'change' is not sender.");
-                    return false;
+                    throw new IntegrityException(ErrorCode.OUTPUT_SENDER_IS_INVALID);
                 }
 
             }
 
         }
         System.out.println("Blockchain is valid");
-        return true;
     }
 
     public void addBlock(Integer difficulty, Block newBlock) {
@@ -164,8 +177,7 @@ public class ChainService {
     public boolean processTransaction(Transaction transaction) {
 
         if (!BlockchainUtil.verifySignature(transaction)) {
-            System.out.println("#Transaction Signature failed to verify");
-            return false;
+            throw new IntegrityException(ErrorCode.SIGNATURE_FAILED_TO_VERIFY);
         }
 
         //gather transaction inputs (Make sure they are unspent):
@@ -174,8 +186,7 @@ public class ChainService {
 
         //check if transaction is valid:
         if (BlockchainUtil.getInputsValue(transaction) < ChainService.minimumTransaction) {
-            System.out.println("#Transaction Inputs to small: " + BlockchainUtil.getInputsValue(transaction));
-            return false;
+            throw new IntegrityException(ErrorCode.TRANSACTION_INPUT_TO_SMALL);
         }
 
         //generate transaction outputs:
@@ -200,8 +211,7 @@ public class ChainService {
         if (transaction == null) return false;
         if ((!block.getPreviousHash().equals("0"))) {
             if ((!processTransaction(transaction))) {
-                System.out.println("Transaction failed to process. Discarded.");
-                return false;
+                throw new IntegrityException(ErrorCode.TRANSACTION_FAILED_TO_PROCESS);
             }
         }
         block.getTransactions().add(transaction);
@@ -223,8 +233,7 @@ public class ChainService {
     //Generates and returns a new transaction from this wallet.
     public Transaction sendFunds(Wallet wallet, PublicKey recipient, Float value) {
         if (getBalance(wallet) < value) { //gather balance and check funds.
-            System.out.println("#Not Enough funds to send transaction. Transaction Discarded.");
-            return null;
+            throw new IntegrityException(ErrorCode.NOT_ENOUGH_FUNDS);
         }
         //create array list of inputs
         List<TransactionInput> inputs = new ArrayList<>();

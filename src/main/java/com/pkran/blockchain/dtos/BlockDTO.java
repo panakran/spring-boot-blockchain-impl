@@ -1,27 +1,18 @@
-package com.pkran.blockchain.models;
-
-import com.pkran.blockchain.Utilities.BlockchainUtil;
+package com.pkran.blockchain.dtos;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
-public class Block {
-
-
+public class BlockDTO {
 
     private String hash;
     private String previousHash;
     private String merkleRoot;
-    private List<Transaction> transactions = new ArrayList<>();
+    private List<TransactionDTO> transactions = new ArrayList<>();
     private Long timeStamp;
     private Integer nonce;
 
-    public Block(String previousHash) {
-        this.previousHash = previousHash;
-        this.timeStamp = new Date().getTime();
-        this.nonce = 0;
-        this.hash = BlockchainUtil.calculateHash(this);
+    public BlockDTO() {
     }
 
     public String getHash() {
@@ -48,11 +39,11 @@ public class Block {
         this.merkleRoot = merkleRoot;
     }
 
-    public List<Transaction> getTransactions() {
+    public List<TransactionDTO> getTransactions() {
         return transactions;
     }
 
-    public void setTransactions(List<Transaction> transactions) {
+    public void setTransactions(List<TransactionDTO> transactions) {
         this.transactions = transactions;
     }
 
@@ -71,5 +62,4 @@ public class Block {
     public void setNonce(Integer nonce) {
         this.nonce = nonce;
     }
-
 }

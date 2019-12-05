@@ -1,14 +1,13 @@
 package com.pkran.blockchain.Utilities;
 
-import com.pkran.blockchain.models.Transaction;
+import com.pkran.blockchain.exceptions.SecurityUtilException;
 import com.pkran.blockchain.models.Wallet;
 
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.spec.ECGenParameterSpec;
-import java.util.Base64;
 
-public class SecurityUtil {
+public final class SecurityUtil {
 
     public static void generateKeyPair(Wallet wallet) {
         try {
@@ -22,7 +21,7 @@ public class SecurityUtil {
             wallet.setPrivateKey(keyPair.getPrivate());
             wallet.setPublicKey(keyPair.getPublic());
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new SecurityUtilException(e);
         }
     }
 
@@ -43,7 +42,7 @@ public class SecurityUtil {
             }
             return hexString.toString();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new SecurityUtilException(e);
         }
     }
 
@@ -59,7 +58,7 @@ public class SecurityUtil {
             byte[] realSig = dsa.sign();
             output = realSig;
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new SecurityUtilException(e);
         }
         return output;
     }
@@ -72,12 +71,8 @@ public class SecurityUtil {
             ecdsaVerify.update(data.getBytes());
             return ecdsaVerify.verify(signature);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new SecurityUtilException(e);
         }
-    }
-
-    public static String getStringFromKey(Key key) {
-        return Base64.getEncoder().encodeToString(key.getEncoded());
     }
 
 }
